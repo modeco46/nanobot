@@ -128,6 +128,21 @@ class TelegramChannel(BaseChannel):
         self._typing_tasks: dict[str, asyncio.Task] = {}  # chat_id -> typing loop task
         self._bot_username: str = ""
     
+    def is_allowed(self, sender_id: str) -> bool:
+        """Handle both plain ID/username and composite 'id|username' format in allowFrom."""
+        if super().is_allowed(sender_id):
+            return True
+
+        allow_list = getattr(self.config, "allow_from", [])
+        if not allow_list or "*" in allow_list:
+            return False
+
+        if "|" not in sender_id:
+            return False
+
+        sid, username = sender_id.split("|", 1)
+        return sid in allow_list or username in allow_list
+
     async def start(self) -> None:
         """Start the Telegram bot with long polling."""
         if not self.config.token:
