@@ -8,6 +8,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 import httpx
+from loguru import logger
 
 from nanobot.agent.tools.base import Tool
 
@@ -61,7 +62,8 @@ class WebSearchTool(Tool):
         self,
         engine: str | None = None,
         api_key: str | None = None,
-        max_results: int = 5
+        max_results: int = 5,
+        proxy: str | None = None,
     ):
         self.engine = engine or os.environ.get("WEB_SEARCH_ENGINE", "brave")
 
@@ -72,6 +74,7 @@ class WebSearchTool(Tool):
         self.brave_key = os.environ.get("BRAVE_API_KEY", "")
 
         self.max_results = max_results
+        self.proxy = proxy
 
     async def execute(self, query: str, count: int | None = None, **kwargs: Any) -> str:
         n = min(max(count or self.max_results, 1), 10)
@@ -84,7 +87,8 @@ class WebSearchTool(Tool):
                 if not self.tavily_key:
                     return "Error: TAVILY_API_KEY not configured"
 
-                async with httpx.AsyncClient() as client:
+                logger.debug("WebSearch (Tavily): {}", "proxy enabled" if self.proxy else "direct connection")
+                async with httpx.AsyncClient(proxy=self.proxy) as client:
                     r = await client.post(
                         "https://api.tavily.com/search",
                         json={
@@ -118,7 +122,8 @@ class WebSearchTool(Tool):
             if not self.brave_key:
                 return "Error: BRAVE_API_KEY not configured"
 
-            async with httpx.AsyncClient() as client:
+            logger.debug("WebSearch (Brave): {}", "proxy enabled" if self.proxy else "direct connection")
+            async with httpx.AsyncClient(proxy=self.proxy) as client:
                 r = await client.get(
                     "https://api.search.brave.com/res/v1/web/search",
                     params={"q": query, "count": n},
@@ -144,14 +149,17 @@ class WebSearchTool(Tool):
 
             return "\n".join(lines)
 
+        except httpx.ProxyError as e:
+            logger.error("WebSearch proxy error: {}", e)
+            return f"Proxy error: {e}"
         except Exception as e:
+            logger.error("WebSearch error: {}", e)
             return f"Error: {e}"
-
 
 
 class WebFetchTool(Tool):
     """Fetch and extract content from a URL using Readability."""
-    
+
     name = "web_fetch"
     description = "Fetch URL and extract readable content (HTML → markdown/text)."
     parameters = {
@@ -163,35 +171,35 @@ class WebFetchTool(Tool):
         },
         "required": ["url"]
     }
-    
-    def __init__(self, max_chars: int = 50000):
+
+    def __init__(self, max_chars: int = 50000, proxy: str | None = None):
         self.max_chars = max_chars
-    
+        self.proxy = proxy
+
     async def execute(self, url: str, extractMode: str = "markdown", maxChars: int | None = None, **kwargs: Any) -> str:
         from readability import Document
 
         max_chars = maxChars or self.max_chars
 
-        # Validate URL before fetching
         is_valid, error_msg = _validate_url(url)
         if not is_valid:
-            return json.dumps({"error": f"URL validation failed: {error_msg}", "url": url})
+            return json.dumps({"error": f"URL validation failed: {error_msg}", "url": url}, ensure_ascii=False)
 
         try:
+            logger.debug("WebFetch: {}", "proxy enabled" if self.proxy else "direct connection")
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 max_redirects=MAX_REDIRECTS,
-                timeout=30.0
+                timeout=30.0,
+                proxy=self.proxy,
             ) as client:
                 r = await client.get(url, headers={"User-Agent": USER_AGENT})
                 r.raise_for_status()
-            
+
             ctype = r.headers.get("content-type", "")
-            
-            # JSON
+
             if "application/json" in ctype:
-                text, extractor = json.dumps(r.json(), indent=2), "json"
-            # HTML
+                text, extractor = json.dumps(r.json(), indent=2, ensure_ascii=False), "json"
             elif "text/html" in ctype or r.text[:256].lower().startswith(("<!doctype", "<html")):
                 doc = Document(r.text)
                 content = self._to_markdown(doc.summary()) if extractMode == "markdown" else _strip_tags(doc.summary())
@@ -199,19 +207,23 @@ class WebFetchTool(Tool):
                 extractor = "readability"
             else:
                 text, extractor = r.text, "raw"
-            
+
             truncated = len(text) > max_chars
             if truncated:
                 text = text[:max_chars]
-            
+
             return json.dumps({"url": url, "finalUrl": str(r.url), "status": r.status_code,
-                              "extractor": extractor, "truncated": truncated, "length": len(text), "text": text})
+                               "extractor": extractor, "truncated": truncated, "length": len(text), "text": text},
+                              ensure_ascii=False)
+        except httpx.ProxyError as e:
+            logger.error("WebFetch proxy error for {}: {}", url, e)
+            return json.dumps({"error": f"Proxy error: {e}", "url": url}, ensure_ascii=False)
         except Exception as e:
-            return json.dumps({"error": str(e), "url": url})
-    
+            logger.error("WebFetch error for {}: {}", url, e)
+            return json.dumps({"error": str(e), "url": url}, ensure_ascii=False)
+
     def _to_markdown(self, html: str) -> str:
         """Convert HTML to markdown."""
-        # Convert links, headings, lists before stripping tags
         text = re.sub(r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>([\s\S]*?)</a>',
                       lambda m: f'[{_strip_tags(m[2])}]({m[1]})', html, flags=re.I)
         text = re.sub(r'<h([1-6])[^>]*>([\s\S]*?)</h\1>',
