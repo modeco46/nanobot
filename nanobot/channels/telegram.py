@@ -487,6 +487,28 @@ class TelegramChannel(BaseChannel):
             session_key=self._derive_topic_session_key(message),
         )
 
+    def _is_mentioned(self, message, bot_username: str | None) -> bool:
+        """Return True if the bot is mentioned or the message is a reply to the bot."""
+        # Reply to bot's own message
+        if message.reply_to_message and message.reply_to_message.from_user:
+            if message.reply_to_message.from_user.is_bot:
+                if not bot_username or message.reply_to_message.from_user.username == bot_username:
+                    return True
+
+        # Explicit @mention in text or caption
+        if bot_username:
+            text = message.text or message.caption or ""
+            if f"@{bot_username}".lower() in text.lower():
+                return True
+
+            for entity in (message.entities or []) + (message.caption_entities or []):
+                if entity.type == "mention":
+                    mentioned = text[entity.offset: entity.offset + entity.length]
+                    if mentioned.lstrip("@").lower() == bot_username.lower():
+                        return True
+
+        return False
+
     async def _on_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle incoming messages (text, photos, voice, documents)."""
         if not update.message or not update.effective_user:
@@ -497,6 +519,12 @@ class TelegramChannel(BaseChannel):
         chat_id = message.chat_id
         sender_id = self._sender_id(user)
         self._remember_thread_context(message)
+
+        # In group chats, only respond when mentioned or replied to
+        if message.chat.type != "private":
+            bot_username = self._app.bot.username if self._app else None
+            if not self._is_mentioned(message, bot_username):
+                return
 
         # Store chat_id for replies
         self._chat_ids[sender_id] = chat_id
@@ -539,7 +567,7 @@ class TelegramChannel(BaseChannel):
                 )
                 media_dir = get_media_dir("telegram")
 
-                file_path = media_dir / f"{media_file.file_id[:16]}{ext}"
+                file_path = media_dir / f"{media_file.file_unique_id}{ext}"
                 await file.download_to_drive(str(file_path))
 
                 media_paths.append(str(file_path))
