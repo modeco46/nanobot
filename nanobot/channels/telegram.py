@@ -111,6 +111,7 @@ class TelegramChannel(BaseChannel):
     BOT_COMMANDS = [
         BotCommand("start", "Start the bot"),
         BotCommand("new", "Start a new conversation"),
+        BotCommand("model", "Show or switch model for this chat"),
         BotCommand("help", "Show available commands"),
     ]
     
@@ -162,6 +163,7 @@ class TelegramChannel(BaseChannel):
         # Add command handlers
         self._app.add_handler(CommandHandler("start", self._on_start))
         self._app.add_handler(CommandHandler("new", self._forward_command))
+        self._app.add_handler(CommandHandler("model", self._forward_command))
         self._app.add_handler(CommandHandler("help", self._on_help))
         
         # Add message handler for text, photos, voice, documents
@@ -316,6 +318,7 @@ class TelegramChannel(BaseChannel):
         await update.message.reply_text(
             "🐈 nanobot commands:\n"
             "/new — Start a new conversation\n"
+            "/model — Show or change model for this chat\n"
             "/help — Show available commands"
         )
 
