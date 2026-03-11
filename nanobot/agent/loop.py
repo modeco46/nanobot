@@ -21,9 +21,11 @@ from nanobot.agent.tools.message import MessageTool
 from nanobot.agent.tools.registry import ToolRegistry
 from nanobot.agent.tools.shell import ExecTool
 from nanobot.agent.tools.spawn import SpawnTool
+from nanobot.agent.commands import HELP_TEXT
 from nanobot.agent.tools.web import WebFetchTool, WebSearchTool
 from nanobot.bus.events import InboundMessage, OutboundMessage
 from nanobot.bus.queue import MessageBus
+from nanobot.config.models import load_models_allowlist
 from nanobot.providers.base import LLMProvider
 from nanobot.session.manager import Session, SessionManager
 
@@ -180,6 +182,7 @@ class AgentLoop:
     async def _run_agent_loop(
         self,
         initial_messages: list[dict],
+        model: str | None = None,
         on_progress: Callable[..., Awaitable[None]] | None = None,
     ) -> tuple[str | None, list[str], list[dict]]:
         """Run the agent iteration loop. Returns (final_content, tools_used, messages)."""
@@ -187,6 +190,7 @@ class AgentLoop:
         iteration = 0
         final_content = None
         tools_used: list[str] = []
+        active_model = model or self.model
 
         while iteration < self.max_iterations:
             iteration += 1
@@ -194,7 +198,7 @@ class AgentLoop:
             response = await self.provider.chat(
                 messages=messages,
                 tools=self.tools.get_definitions(),
-                model=self.model,
+                model=active_model,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
                 reasoning_effort=self.reasoning_effort,
@@ -255,6 +259,14 @@ class AgentLoop:
             )
 
         return final_content, tools_used, messages
+
+    def _resolve_session_model(self, session: Session) -> str:
+        """Return model configured for the session or the global default."""
+        for key in ("temp_model", "model"):
+            model = session.metadata.get(key)
+            if isinstance(model, str) and model.strip():
+                return model
+        return self.model
 
     async def run(self) -> None:
         """Run the agent loop, dispatching messages as tasks to stay responsive to /stop."""
@@ -360,7 +372,8 @@ class AgentLoop:
         session = self.sessions.get_or_create(key)
 
         # Slash commands
-        cmd = msg.content.strip().lower()
+        raw_cmd = msg.content.strip()
+        cmd = raw_cmd.lower()
         if cmd == "/new":
             lock = self._consolidation_locks.setdefault(session.key, asyncio.Lock())
             self._consolidating.add(session.key)
@@ -385,13 +398,76 @@ class AgentLoop:
                 self._consolidating.discard(session.key)
 
             session.clear()
+            session.metadata.pop("model", None)
+            session.metadata.pop("temp_model", None)
             self.sessions.save(session)
             self.sessions.invalidate(session.key)
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
                                   content="New session started.")
         if cmd == "/help":
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="🐈 nanobot commands:\n/new — Start a new conversation\n/stop — Stop the current task\n/help — Show available commands")
+                                  content=HELP_TEXT)
+        if cmd.startswith("/model"):
+            model_name = raw_cmd[6:].strip()
+
+            if model_name.lower() in {"reset", "default", "clear"}:
+                session.metadata.pop("model", None)
+                session.metadata.pop("temp_model", None)
+                self.sessions.save(session)
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=f"Model reset to default: {self.model}",
+                )
+
+            models, source, load_error = load_models_allowlist()
+
+            if not model_name:
+                current = self._resolve_session_model(session)
+                temp_overridden = session.metadata.get("temp_model")
+                overridden = session.metadata.get("model")
+                mode = "temporary override" if temp_overridden else "chat override" if overridden else "default"
+                src = str(source) if source else "(file not found)"
+                listing = "\nAvailable models:\n- " + "\n- ".join(models) if models else "\nAvailable models: list is empty"
+                error_line = f"\nWarning: {load_error}" if load_error else ""
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=(
+                        f"Current model: {current} ({mode})\n"
+                        f"Models source: {src}{listing}{error_line}\n"
+                        "Usage: /model <provider/model>\n"
+                        "Reset to default: /model reset"
+                    ),
+                )
+
+            if any(ch.isspace() for ch in model_name) or "/" not in model_name:
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content="Invalid model name. Use format: /model provider/model",
+                )
+
+            if load_error or not source or model_name not in models:
+                session.metadata["temp_model"] = model_name
+                self.sessions.save(session)
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=(
+                        f"Temporary model set for this chat: {model_name}\n"
+                        "This model is outside allowlist and will be used only for this chat until /model reset."
+                    ),
+                )
+
+            session.metadata["model"] = model_name
+            session.metadata.pop("temp_model", None)
+            self.sessions.save(session)
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content=f"Model switched for this chat: {model_name}",
+            )
 
         unconsolidated = len(session.messages) - session.last_consolidated
         if (unconsolidated >= self.memory_window and session.key not in self._consolidating):
@@ -417,6 +493,7 @@ class AgentLoop:
                 message_tool.start_turn()
 
         history = session.get_history(max_messages=self.memory_window)
+        active_model = self._resolve_session_model(session)
         initial_messages = self.context.build_messages(
             history=history,
             current_message=msg.content,
@@ -433,7 +510,7 @@ class AgentLoop:
             ))
 
         final_content, _, all_msgs = await self._run_agent_loop(
-            initial_messages, on_progress=on_progress or _bus_progress,
+            initial_messages, model=active_model, on_progress=on_progress or _bus_progress,
         )
 
         if final_content is None:

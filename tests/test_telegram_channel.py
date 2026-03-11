@@ -182,3 +182,9 @@ async def test_send_reply_infers_topic_from_message_id_cache() -> None:
 
     assert channel._app.bot.sent_messages[0]["message_thread_id"] == 42
     assert channel._app.bot.sent_messages[0]["reply_parameters"].message_id == 10
+
+
+def test_bot_commands_include_model_switch() -> None:
+    names = [cmd.command for cmd in TelegramChannel.BOT_COMMANDS]
+
+    assert "model" in names
