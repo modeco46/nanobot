@@ -33,6 +33,10 @@ def test_load_models_allowlist_returns_error_for_invalid_json(tmp_path: Path):
         assert error is not None
     finally:
         set_config_path(original)
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+ main
 
 
 def test_load_models_allowlist_skips_directory_candidate(tmp_path: Path):
@@ -49,3 +53,8 @@ def test_load_models_allowlist_skips_directory_candidate(tmp_path: Path):
         assert error is None
     finally:
         set_config_path(original)
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
+
+
+ main
+ main

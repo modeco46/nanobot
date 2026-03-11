@@ -46,7 +46,7 @@ class AgentLoop:
     5. Sends responses back
     """
 
-    _TOOL_RESULT_MAX_CHARS = 500
+    _TOOL_RESULT_MAX_CHARS = 700
 
     def __init__(
         self,
@@ -262,12 +262,29 @@ class AgentLoop:
 
     def _resolve_session_model(self, session: Session) -> str:
         """Return model configured for the session or the global default."""
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+
+ codex/implement-dynamic-model-switching-in-bot-c42t1p
+ main
+ main
         for key in ("temp_model", "model"):
             model = session.metadata.get(key)
             if isinstance(model, str) and model.strip():
                 return model
         return self.model
 
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+
+        model = session.metadata.get("model")
+        return model if isinstance(model, str) and model.strip() else self.model
+ main
+
+ main
+ main
     async def run(self) -> None:
         """Run the agent loop, dispatching messages as tasks to stay responsive to /stop."""
         self._running = True
@@ -399,7 +416,18 @@ class AgentLoop:
 
             session.clear()
             session.metadata.pop("model", None)
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
             session.metadata.pop("temp_model", None)
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+            session.metadata.pop("temp_model", None)
+
+ codex/implement-dynamic-model-switching-in-bot-c42t1p
+            session.metadata.pop("temp_model", None)
+
+ main
+ main
+ main
             self.sessions.save(session)
             self.sessions.invalidate(session.key)
             return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
@@ -412,7 +440,18 @@ class AgentLoop:
 
             if model_name.lower() in {"reset", "default", "clear"}:
                 session.metadata.pop("model", None)
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
                 session.metadata.pop("temp_model", None)
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+                session.metadata.pop("temp_model", None)
+
+ codex/implement-dynamic-model-switching-in-bot-c42t1p
+                session.metadata.pop("temp_model", None)
+
+ main
+ main
+ main
                 self.sessions.save(session)
                 return OutboundMessage(
                     channel=msg.channel,
@@ -424,9 +463,26 @@ class AgentLoop:
 
             if not model_name:
                 current = self._resolve_session_model(session)
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
                 temp_overridden = session.metadata.get("temp_model")
                 overridden = session.metadata.get("model")
                 mode = "temporary override" if temp_overridden else "chat override" if overridden else "default"
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+                temp_overridden = session.metadata.get("temp_model")
+                overridden = session.metadata.get("model")
+                mode = "temporary override" if temp_overridden else "chat override" if overridden else "default"
+
+ codex/implement-dynamic-model-switching-in-bot-c42t1p
+                temp_overridden = session.metadata.get("temp_model")
+                overridden = session.metadata.get("model")
+                mode = "temporary override" if temp_overridden else "chat override" if overridden else "default"
+
+                overridden = session.metadata.get("model")
+                mode = "chat override" if overridden else "default"
+ main
+ main
+ main
                 src = str(source) if source else "(file not found)"
                 listing = "\nAvailable models:\n- " + "\n- ".join(models) if models else "\nAvailable models: list is empty"
                 error_line = f"\nWarning: {load_error}" if load_error else ""
@@ -448,20 +504,79 @@ class AgentLoop:
                     content="Invalid model name. Use format: /model provider/model",
                 )
 
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
             if load_error or not source or model_name not in models:
                 session.metadata["temp_model"] = model_name
                 self.sessions.save(session)
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+            if load_error or not source or model_name not in models:
+                session.metadata["temp_model"] = model_name
+                self.sessions.save(session)
+
+ codex/implement-dynamic-model-switching-in-bot-c42t1p
+            if load_error or not source or model_name not in models:
+                session.metadata["temp_model"] = model_name
+                self.sessions.save(session)
+
+            if load_error:
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=f"Cannot load model allowlist from {source}: {load_error}",
+                )
+
+            if not source:
+ main
                 return OutboundMessage(
                     channel=msg.channel,
                     chat_id=msg.chat_id,
                     content=(
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
                         f"Temporary model set for this chat: {model_name}\n"
                         "This model is outside allowlist and will be used only for this chat until /model reset."
+
+                        "Model list file not found. Create one near your config: "
+                        "models, models.txt or models.json"
+                    ),
+                )
+
+            if model_name not in models:
+ main
+ main
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=(
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
+                        f"Temporary model set for this chat: {model_name}\n"
+                        "This model is outside allowlist and will be used only for this chat until /model reset."
+
+ codex/implement-dynamic-model-switching-in-bot-c42t1p
+                        f"Temporary model set for this chat: {model_name}\n"
+                        "This model is outside allowlist and will be used only for this chat until /model reset."
+
+                        f"Model '{model_name}' is not in allowlist ({source}).\n"
+                        "Use /model to see available models."
+ main
+ main
+ main
                     ),
                 )
 
             session.metadata["model"] = model_name
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
             session.metadata.pop("temp_model", None)
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+            session.metadata.pop("temp_model", None)
+
+ codex/implement-dynamic-model-switching-in-bot-c42t1p
+            session.metadata.pop("temp_model", None)
+
+ main
+ main
+ main
             self.sessions.save(session)
             return OutboundMessage(
                 channel=msg.channel,

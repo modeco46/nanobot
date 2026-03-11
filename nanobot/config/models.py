@@ -29,7 +29,15 @@ def load_models_allowlist() -> tuple[list[str], Path | None, str | None]:
         (models, source_path, error_message)
     """
     for path in get_models_candidates():
+ codex/implement-dynamic-model-switching-in-bot-8zkqjx
         if not path.exists() or not path.is_file():
+
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+        if not path.exists() or not path.is_file():
+
+        if not path.exists():
+ main
+ main
             continue
 
         try:
