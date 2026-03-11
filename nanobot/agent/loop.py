@@ -430,7 +430,7 @@ class AgentLoop:
                     content=(
                         f"Current model: {current} ({mode})\n"
                         f"Models source: {src}{listing}{error_line}\n"
-                        "Usage: /model <provider/model>\n"
+                        "Usage: /model <provider/model> — switch to any model\n"
                         "Reset to default: /model reset"
                     ),
                 )
@@ -440,33 +440,6 @@ class AgentLoop:
                     channel=msg.channel,
                     chat_id=msg.chat_id,
                     content="Invalid model name. Use format: /model provider/model",
-                )
-
-            if load_error:
-                return OutboundMessage(
-                    channel=msg.channel,
-                    chat_id=msg.chat_id,
-                    content=f"Cannot load model allowlist from {source}: {load_error}",
-                )
-
-            if not source:
-                return OutboundMessage(
-                    channel=msg.channel,
-                    chat_id=msg.chat_id,
-                    content=(
-                        "Model list file not found. Create one near your config: "
-                        "models, models.txt or models.json"
-                    ),
-                )
-
-            if model_name not in models:
-                return OutboundMessage(
-                    channel=msg.channel,
-                    chat_id=msg.chat_id,
-                    content=(
-                        f"Model '{model_name}' is not in allowlist ({source}).\n"
-                        "Use /model to see available models."
-                    ),
                 )
 
             session.metadata["model"] = model_name
