@@ -328,10 +328,17 @@ class TelegramChannel(BaseChannel):
         """Forward slash commands to the bus for unified handling in AgentLoop."""
         if not update.message or not update.effective_user:
             return
+        sender_id = self._sender_id(update.effective_user)
+        chat_id = str(update.message.chat_id)
+        # In groups, commands must target the same per-user session that messages use,
+        # otherwise /model sets metadata on a different session than the one that
+        # actually processes messages.
+        group_session_key = f"telegram:{sender_id}" if update.message.chat.type != "private" else None
         await self._handle_message(
-            sender_id=self._sender_id(update.effective_user),
-            chat_id=str(update.message.chat_id),
+            sender_id=sender_id,
+            chat_id=chat_id,
             content=update.message.text,
+            session_key=group_session_key,
         )
     
     async def _on_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
