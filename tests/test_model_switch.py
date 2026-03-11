@@ -55,10 +55,14 @@ async def test_model_command_sets_and_resets_session_model(tmp_path, config_near
 
 
 @pytest.mark.asyncio
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+async def test_model_command_allows_temporary_model_outside_allowlist(tmp_path, config_near_models):
+
  codex/implement-dynamic-model-switching-in-bot-c42t1p
 async def test_model_command_allows_temporary_model_outside_allowlist(tmp_path, config_near_models):
 
 async def test_model_command_rejects_models_outside_allowlist(tmp_path, config_near_models):
+ main
  main
     loop = AgentLoop(bus=MessageBus(), provider=_DummyProvider(), workspace=tmp_path)
 
@@ -66,7 +70,10 @@ async def test_model_command_rejects_models_outside_allowlist(tmp_path, config_n
         InboundMessage(channel="cli", sender_id="u", chat_id="c", content="/model anthropic/claude-3-5-sonnet")
     )
 
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+
  codex/implement-dynamic-model-switching-in-bot-c42t1p
+ main
     assert "Temporary model set" in resp.content
 
     show_resp = await loop._process_message(
@@ -75,9 +82,12 @@ async def test_model_command_rejects_models_outside_allowlist(tmp_path, config_n
     assert "anthropic/claude-3-5-sonnet" in show_resp.content
     assert "temporary override" in show_resp.content
 
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+
     assert "not in allowlist" in resp.content
  main
 
+ main
 
 @pytest.mark.asyncio
 async def test_model_command_rejects_invalid_format_without_provider_prefix(tmp_path, config_near_models):
@@ -95,20 +105,30 @@ async def test_new_command_clears_model_override(tmp_path, config_near_models):
     loop = AgentLoop(bus=MessageBus(), provider=_DummyProvider(), workspace=tmp_path)
     session = loop.sessions.get_or_create("cli:c")
     session.metadata["model"] = "openai/gpt-4o-mini"
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+    session.metadata["temp_model"] = "openai/gpt-5.1"
+
+
  codex/implement-dynamic-model-switching-in-bot-c42t1p
     session.metadata["temp_model"] = "openai/gpt-5.1"
 
  main
 
+ main
     await loop._process_message(InboundMessage(channel="cli", sender_id="u", chat_id="c", content="/new"))
 
     refreshed = loop.sessions.get_or_create("cli:c")
     assert "model" not in refreshed.metadata
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+    assert "temp_model" not in refreshed.metadata
+
+
  codex/implement-dynamic-model-switching-in-bot-c42t1p
     assert "temp_model" not in refreshed.metadata
 
  main
 
+ main
 
 @pytest.mark.asyncio
 async def test_model_show_reports_read_error_for_invalid_json_allowlist(tmp_path):
@@ -130,18 +150,27 @@ async def test_regular_messages_use_session_model_override(tmp_path):
     loop = AgentLoop(bus=MessageBus(), provider=_DummyProvider(), workspace=tmp_path)
     session = loop.sessions.get_or_create("cli:c")
     session.metadata["model"] = "openai/gpt-4o-mini"
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+    session.metadata["temp_model"] = "openai/gpt-5.1"
+
+
  codex/implement-dynamic-model-switching-in-bot-c42t1p
     session.metadata["temp_model"] = "openai/gpt-5.1"
 
  main
 
+ main
     loop._run_agent_loop = AsyncMock(return_value=("ok", [], []))
 
     await loop._process_message(InboundMessage(channel="cli", sender_id="u", chat_id="c", content="hello"))
 
     assert loop._run_agent_loop.await_count == 1
+ codex/implement-dynamic-model-switching-in-bot-ki1ptz
+    assert loop._run_agent_loop.await_args.kwargs["model"] == "openai/gpt-5.1"
+
  codex/implement-dynamic-model-switching-in-bot-c42t1p
     assert loop._run_agent_loop.await_args.kwargs["model"] == "openai/gpt-5.1"
 
     assert loop._run_agent_loop.await_args.kwargs["model"] == "openai/gpt-4o-mini"
+ main
  main
