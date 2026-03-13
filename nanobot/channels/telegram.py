@@ -111,6 +111,7 @@ class TelegramChannel(BaseChannel):
     # Commands registered with Telegram's command menu
     BOT_COMMANDS = [
         BotCommand("start", "Start the bot"),
+        BotCommand("stop", "Stop the current task"),
         BotCommand("new", "Start a new conversation"),
         BotCommand("model", "Show or switch model for this chat"),
         BotCommand("help", "Show available commands"),
@@ -163,6 +164,7 @@ class TelegramChannel(BaseChannel):
         
         # Add command handlers
         self._app.add_handler(CommandHandler("start", self._on_start))
+        self._app.add_handler(CommandHandler("stop", self._forward_command))
         self._app.add_handler(CommandHandler("new", self._forward_command))
         self._app.add_handler(CommandHandler("model", self._forward_command))
         self._app.add_handler(CommandHandler("help", self._on_help))
