@@ -121,8 +121,10 @@ def test_onboard_fresh_install(mock_paths):
     assert result.exit_code == 0
     assert "Created config" in result.stdout
     assert "Created workspace" in result.stdout
+    assert "Created models" in result.stdout
     assert "nanobot is ready" in result.stdout
     assert config_file.exists()
+    assert (config_file.parent / "models").exists()
     assert (workspace_dir / "AGENTS.md").exists()
     assert (workspace_dir / "memory" / "MEMORY.md").exists()
 
@@ -166,6 +168,20 @@ def test_onboard_existing_workspace_safe_create(mock_paths):
     assert "Created workspace" not in result.stdout
     assert "Created AGENTS.md" in result.stdout
     assert (workspace_dir / "AGENTS.md").exists()
+
+
+def test_onboard_does_not_overwrite_existing_models_file(mock_paths):
+    """Existing models allowlist should be preserved."""
+    config_file, _workspace_dir = mock_paths
+    config_file.write_text("{}")
+    models_file = config_file.parent / "models"
+    models_file.write_text("custom/provider-model\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["onboard"], input="n\n")
+
+    assert result.exit_code == 0
+    assert "Created models" not in result.stdout
+    assert models_file.read_text(encoding="utf-8") == "custom/provider-model\n"
 
 
 def test_config_matches_github_copilot_codex_with_hyphen_prefix():
