@@ -1,4 +1,5 @@
 import shutil
+import json
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -55,6 +56,14 @@ def test_onboard_fresh_install(mock_paths):
     assert "Created workspace" in result.stdout
     assert "nanobot is ready" in result.stdout
     assert config_file.exists()
+    saved = json.loads(config_file.read_text())
+    assert saved["agents"]["defaults"]["model"] == "google/gemini-3-flash-preview"
+    assert saved["agents"]["defaults"]["provider"] == "custom"
+    assert saved["agents"]["defaults"]["memoryWindow"] == 50
+    assert saved["channels"]["telegram"]["enabled"] is True
+    assert "whatsapp" not in saved["channels"]
+    assert saved["providers"]["custom"]["apiKey"] == ""
+    assert "openrouter" not in saved["providers"]
     assert (workspace_dir / "AGENTS.md").exists()
     assert (workspace_dir / "memory" / "MEMORY.md").exists()
 
@@ -62,13 +71,21 @@ def test_onboard_fresh_install(mock_paths):
 def test_onboard_existing_config_refresh(mock_paths):
     """Config exists, user declines overwrite — should refresh (load-merge-save)."""
     config_file, workspace_dir = mock_paths
-    config_file.write_text('{"existing": true}')
+    config_file.write_text(json.dumps({
+        "existing": True,
+        "channels": {"telegram": {"allowFrom": ["talismansim"]}},
+        "providers": {"custom": {"apiKey": "secret"}},
+    }))
 
     result = runner.invoke(app, ["onboard"], input="n\n")
 
     assert result.exit_code == 0
     assert "Config already exists" in result.stdout
     assert "existing values preserved" in result.stdout
+    saved = json.loads(config_file.read_text())
+    assert "existing" not in saved
+    assert saved["channels"]["telegram"]["allowFrom"] == ["talismansim"]
+    assert saved["providers"]["custom"]["apiKey"] == "secret"
     assert workspace_dir.exists()
     assert (workspace_dir / "AGENTS.md").exists()
 
