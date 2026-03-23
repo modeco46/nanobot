@@ -6,12 +6,78 @@ import pytest
 from typer.testing import CliRunner
 
 from nanobot.cli.commands import app
+from nanobot.config.loader import get_onboard_default_config_data
 from nanobot.config.schema import Config
 from nanobot.providers.litellm_provider import LiteLLMProvider
 from nanobot.providers.openai_codex_provider import _strip_model_prefix
 from nanobot.providers.registry import find_by_model
 
 runner = CliRunner()
+
+
+def test_onboard_default_config_template_matches_expected():
+    assert get_onboard_default_config_data() == {
+        "agents": {
+            "defaults": {
+                "workspace": "~/.nanobot/workspace",
+                "model": "",
+                "provider": "custom",
+                "maxTokens": 8192,
+                "temperature": 0.1,
+                "maxToolIterations": 40,
+                "memoryWindow": 50,
+                "reasoningEffort": None,
+            }
+        },
+        "channels": {
+            "sendProgress": True,
+            "sendToolHints": False,
+            "whatsapp": {
+                "enabled": False,
+                "bridgeUrl": "ws://localhost:3001",
+                "bridgeToken": "",
+                "allowFrom": [],
+            },
+            "telegram": {
+                "enabled": True,
+                "token": "",
+                "allowFrom": [],
+                "proxy": None,
+                "replyToMessage": False,
+            },
+        },
+        "providers": {
+            "custom": {
+                "apiKey": "",
+                "apiBase": "",
+                "extraHeaders": None,
+            }
+        },
+        "gateway": {
+            "host": "0.0.0.0",
+            "port": 18790,
+            "heartbeat": {
+                "enabled": True,
+                "intervalS": 3600,
+            },
+        },
+        "tools": {
+            "web": {
+                "proxy": None,
+                "search": {
+                    "engine": "tavily",
+                    "apiKey": "",
+                    "maxResults": 10,
+                },
+            },
+            "exec": {
+                "timeout": 60,
+                "pathAppend": "",
+            },
+            "restrictToWorkspace": False,
+            "mcpServers": {},
+        },
+    }
 
 
 class _StopGateway(RuntimeError):
@@ -23,6 +89,7 @@ def mock_paths():
     """Mock config/workspace paths for test isolation."""
     with patch("nanobot.config.loader.get_config_path") as mock_cp, \
          patch("nanobot.config.loader.save_config") as mock_sc, \
+         patch("nanobot.config.loader.save_onboard_default_config") as mock_onboard_sc, \
          patch("nanobot.config.loader.load_config") as mock_lc, \
          patch("nanobot.cli.commands.get_workspace_path") as mock_ws:
 
@@ -37,6 +104,7 @@ def mock_paths():
         mock_cp.return_value = config_file
         mock_ws.return_value = workspace_dir
         mock_sc.side_effect = lambda config: config_file.write_text("{}")
+        mock_onboard_sc.side_effect = lambda: config_file.write_text("{}")
 
         yield config_file, workspace_dir
 
