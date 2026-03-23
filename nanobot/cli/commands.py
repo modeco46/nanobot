@@ -170,8 +170,12 @@ def main(
 @app.command()
 def onboard():
     """Initialize nanobot configuration and workspace."""
-    from nanobot.config.loader import get_config_path, load_config, save_config
-    from nanobot.config.schema import Config
+    from nanobot.config.loader import (
+        get_config_path,
+        load_config,
+        save_config,
+        save_onboard_default_config,
+    )
 
     config_path = get_config_path()
 
@@ -180,15 +184,14 @@ def onboard():
         console.print("  [bold]y[/bold] = overwrite with defaults (existing values will be lost)")
         console.print("  [bold]N[/bold] = refresh config, keeping existing values and adding new fields")
         if typer.confirm("Overwrite?"):
-            config = Config()
-            save_config(config)
+            save_onboard_default_config()
             console.print(f"[green]✓[/green] Config reset to defaults at {config_path}")
         else:
             config = load_config()
             save_config(config)
             console.print(f"[green]✓[/green] Config refreshed at {config_path} (existing values preserved)")
     else:
-        save_config(Config())
+        save_onboard_default_config()
         console.print(f"[green]✓[/green] Created config at {config_path}")
 
     # Create workspace
