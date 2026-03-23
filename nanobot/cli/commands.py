@@ -293,10 +293,6 @@ def _merge_with_template(template: dict, existing: dict) -> dict:
         else:
             merged[key] = current if current is not None else default_value
     return merged
- telegram
-
-
-
 
 
 def _make_provider(config: Config):
