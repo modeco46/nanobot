@@ -73,14 +73,12 @@ class AgentDefaults(Base):
     """Default agent configuration."""
 
     workspace: str = "~/.nanobot/workspace"
-    model: str = "anthropic/claude-opus-4-5"
-    provider: str = (
-        "auto"  # Provider name (e.g. "anthropic", "openrouter") or "auto" for auto-detection
-    )
+    model: str = "google/gemini-3-flash-preview"
+    provider: str = "custom"  # Provider name (e.g. "anthropic", "openrouter") or "auto"
     max_tokens: int = 8192
     temperature: float = 0.1
     max_tool_iterations: int = 40
-    memory_window: int = 100
+    memory_window: int = 50
     reasoning_effort: str | None = None  # low / medium / high — enables LLM thinking mode
 
 
@@ -139,8 +137,9 @@ class GatewayConfig(Base):
 class WebSearchConfig(Base):
     """Web search tool configuration."""
 
-    api_key: str = ""  # Brave Search API key
-    max_results: int = 5
+    engine: str = "tavily"
+    api_key: str = ""
+    max_results: int = 10
 
 
 class WebToolsConfig(Base):
