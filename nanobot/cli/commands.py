@@ -246,7 +246,7 @@ def _onboard_config_template() -> dict:
             "port": 18790,
             "heartbeat": {
                 "enabled": True,
-                "intervalS": 1800,
+                "intervalS": 3600,
             },
         },
         "tools": {
