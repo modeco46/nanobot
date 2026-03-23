@@ -6,6 +6,7 @@ import asyncio
 import re
 from loguru import logger
 from telegram import BotCommand, Update, ReplyParameters
+from telegram.error import NetworkError, TimedOut
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.request import HTTPXRequest
 
@@ -153,57 +154,72 @@ class TelegramChannel(BaseChannel):
             return
         
         self._running = True
-        
-        # Build the application with larger connection pool to avoid pool-timeout on long runs
-        req = HTTPXRequest(connection_pool_size=16, pool_timeout=5.0, connect_timeout=30.0, read_timeout=30.0)
-        builder = Application.builder().token(self.config.token).request(req).get_updates_request(req)
+
+        retry_delay_s = 5
+        while self._running:
+            try:
+                self._build_app()
+                logger.info("Starting Telegram bot (polling mode)...")
+
+                # Initialize and start polling
+                await self._app.initialize()
+                await self._app.start()
+
+                # Get bot info and register command menu
+                bot_info = await self._app.bot.get_me()
+                logger.info("Telegram bot @{} connected", bot_info.username)
+                self._bot_username = bot_info.username.lower()
+
+                try:
+                    await self._app.bot.set_my_commands(self.BOT_COMMANDS)
+                    logger.debug("Telegram bot commands registered")
+                except Exception as e:
+                    logger.warning("Failed to register bot commands: {}", e)
+
+                await self._app.updater.start_polling(
+                    allowed_updates=["message"],
+                    drop_pending_updates=True,
+                )
+
+                # Keep running until stopped
+                while self._running:
+                    await asyncio.sleep(1)
+                break
+            except (TimedOut, NetworkError) as e:
+                logger.warning("Telegram startup/network error: {}. Retrying in {}s...", e, retry_delay_s)
+                await self._safe_shutdown_app()
+                if self._running:
+                    await asyncio.sleep(retry_delay_s)
+            except Exception:
+                await self._safe_shutdown_app()
+                raise
+
+    def _build_app(self) -> None:
+        """Build and configure PTB application instance."""
+        req_kwargs = {
+            "connection_pool_size": 16,
+            "pool_timeout": 10.0,
+            "connect_timeout": 30.0,
+            "read_timeout": 60.0,
+        }
         if self.config.proxy:
-            builder = builder.proxy(self.config.proxy).get_updates_proxy(self.config.proxy)
+            req_kwargs["proxy"] = self.config.proxy
+        req = HTTPXRequest(**req_kwargs)
+        builder = Application.builder().token(self.config.token).request(req).get_updates_request(req)
         self._app = builder.build()
         self._app.add_error_handler(self._on_error)
-        
-        # Add command handlers
         self._app.add_handler(CommandHandler("start", self._on_start))
         self._app.add_handler(CommandHandler("stop", self._forward_command))
         self._app.add_handler(CommandHandler("new", self._forward_command))
         self._app.add_handler(CommandHandler("model", self._forward_command))
         self._app.add_handler(CommandHandler("help", self._on_help))
-        
-        # Add message handler for text, photos, voice, documents
         self._app.add_handler(
             MessageHandler(
-                (filters.TEXT | filters.PHOTO | filters.VOICE | filters.AUDIO | filters.Document.ALL) 
-                & ~filters.COMMAND, 
-                self._on_message
+                (filters.TEXT | filters.PHOTO | filters.VOICE | filters.AUDIO | filters.Document.ALL)
+                & ~filters.COMMAND,
+                self._on_message,
             )
         )
-        
-        logger.info("Starting Telegram bot (polling mode)...")
-        
-        # Initialize and start polling
-        await self._app.initialize()
-        await self._app.start()
-        
-        # Get bot info and register command menu
-        bot_info = await self._app.bot.get_me()
-        logger.info("Telegram bot @{} connected", bot_info.username)
-        self._bot_username = bot_info.username.lower()
-        
-        try:
-            await self._app.bot.set_my_commands(self.BOT_COMMANDS)
-            logger.debug("Telegram bot commands registered")
-        except Exception as e:
-            logger.warning("Failed to register bot commands: {}", e)
-        
-        # Start polling (this runs until stopped)
-        await self._app.updater.start_polling(
-            allowed_updates=["message"],
-            drop_pending_updates=True  # Ignore old messages on startup
-        )
-        
-        # Keep running until stopped
-        while self._running:
-            await asyncio.sleep(1)
     
     async def stop(self) -> None:
         """Stop the Telegram bot."""
@@ -212,13 +228,26 @@ class TelegramChannel(BaseChannel):
         # Cancel all typing indicators
         for chat_id in list(self._typing_tasks):
             self._stop_typing(chat_id)
-        
-        if self._app:
-            logger.info("Stopping Telegram bot...")
+
+        await self._safe_shutdown_app()
+
+    async def _safe_shutdown_app(self) -> None:
+        if not self._app:
+            return
+        logger.info("Stopping Telegram bot...")
+        try:
             await self._app.updater.stop()
+        except Exception:
+            pass
+        try:
             await self._app.stop()
+        except Exception:
+            pass
+        try:
             await self._app.shutdown()
-            self._app = None
+        except Exception:
+            pass
+        self._app = None
     
     @staticmethod
     def _get_media_type(path: str) -> str:
