@@ -1,6 +1,7 @@
 """Configuration loading utilities."""
 
 import json
+from importlib.resources import files as pkg_files
 from pathlib import Path
 
 from nanobot.config.schema import Config
@@ -138,6 +139,19 @@ def save_onboard_default_config(config_path: Path | None = None) -> None:
 
     with open(path, "w", encoding="utf-8") as f:
         json.dump(get_onboard_default_config_data(), f, indent=2, ensure_ascii=False)
+
+
+def save_onboard_models_file(config_path: Path | None = None) -> Path | None:
+    """Copy bundled `models` file next to config if it doesn't exist yet."""
+    path = config_path or get_config_path()
+    target = path.parent / "models"
+    if target.exists():
+        return None
+
+    source = pkg_files("nanobot.config") / "models"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    return target
 
 
 def _migrate_config(data: dict) -> dict:

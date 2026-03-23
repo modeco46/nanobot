@@ -175,6 +175,7 @@ def onboard():
         load_config,
         save_config,
         save_onboard_default_config,
+        save_onboard_models_file,
     )
 
     config_path = get_config_path()
@@ -193,6 +194,10 @@ def onboard():
     else:
         save_onboard_default_config()
         console.print(f"[green]✓[/green] Created config at {config_path}")
+
+    models_path = save_onboard_models_file(config_path)
+    if models_path is not None:
+        console.print(f"[green]✓[/green] Created models at {models_path}")
 
     # Create workspace
     workspace = get_workspace_path()
