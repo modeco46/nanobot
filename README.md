@@ -15,9 +15,7 @@
 - built-in tools (shell/web/MCP)
 - memory, cron tasks, and heartbeat services
 
-> Current package version in this repo: **0.1.4.post4**.
-
-## What is актуально in this repo
+## What is actual in this repo
 
 This README reflects the current codebase (including merged PR changes) and intentionally removes outdated/marketing-heavy sections.
 
