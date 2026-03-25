@@ -3,7 +3,6 @@
   <h1>nanobot</h1>
   <p>Lightweight personal AI assistant framework (Python 3.11+)</p>
   <p>
-    <a href="https://pypi.org/project/nanobot-ai/"><img src="https://img.shields.io/pypi/v/nanobot-ai" alt="PyPI"></a>
     <img src="https://img.shields.io/badge/python-≥3.11-blue" alt="Python">
     <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   </p>
@@ -194,7 +193,6 @@ The global override is stored in `{workspace}/global_model` as plain text and su
 To pre-populate the list shown by `/model`, create a `models` file next to `config.json`:
 
 ```
-# one model per line, # comments allowed
 google/gemini-3-flash-preview
 x-ai/grok-4.1-fast
 openai/gpt-5-mini
@@ -203,7 +201,7 @@ openai/gpt-5-mini
 ## Tools and capabilities
 
 - **Shell execution tool** with timeout/path controls
-- **Web search tool** (Brave API)
+- **Web search tool** (Tavily API)
 - **MCP servers** via `stdio`, `sse`, or `streamableHttp`
 - **Cron service** for scheduled jobs
 - **Heartbeat service** for periodic activity
