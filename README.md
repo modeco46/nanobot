@@ -175,6 +175,31 @@ nanobot gateway
 | [**Moltbook**](https://www.moltbook.com/) | `Read https://moltbook.com/skill.md and follow the instructions to join Moltbook` |
 | [**ClawdChat**](https://clawdchat.ai/) | `Read https://clawdchat.ai/skill.md and follow the instructions to join ClawdChat` |
 
+## Runtime model switching
+
+You can change the active model without restarting the bot by sending `/model` commands directly in the chat.
+
+| Command | Effect |
+|---|---|
+| `/model` | Show current model, source, and available models |
+| `/model <provider/model>` | Switch model for this chat/session only |
+| `/model reset` | Clear session override (falls back to global or config default) |
+| `/model global <provider/model>` | Switch model for **all** chats and groups |
+| `/model global reset` | Remove global override (falls back to config default) |
+
+**Priority:** session override → global override → config default (`model` in `config.json`)
+
+The global override is stored in `{workspace}/global_model` as plain text and survives restarts.
+
+To pre-populate the list shown by `/model`, create a `models` file next to `config.json`:
+
+```
+# one model per line, # comments allowed
+google/gemini-3-flash-preview
+x-ai/grok-4.1-fast
+openai/gpt-5-mini
+```
+
 ## Tools and capabilities
 
 - **Shell execution tool** with timeout/path controls
