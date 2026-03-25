@@ -35,44 +35,15 @@ This README reflects the current codebase (including merged PR changes) and inte
 
 ### Implemented provider configuration
 - custom (OpenAI-compatible endpoint)
-- azure_openai
-- anthropic
-- openai
-- openrouter
-- deepseek
-- groq
-- zhipu
-- dashscope
-- vllm
-- gemini
-- moonshot
-- minimax
-- aihubmix
-- siliconflow
-- volcengine
-- openai_codex (OAuth)
-- github_copilot (OAuth)
 
 ## Installation
 
 ### From source (recommended for development)
 
 ```bash
-git clone https://github.com/HKUDS/nanobot.git
+git clone https://github.com/modeco46/nanobot
 cd nanobot
 pip install -e .
-```
-
-### From PyPI
-
-```bash
-pip install nanobot-ai
-```
-
-### With uv
-
-```bash
-uv tool install nanobot-ai
 ```
 
 ## Quick start
@@ -93,14 +64,63 @@ Minimal example using OpenRouter:
 {
   "agents": {
     "defaults": {
-      "model": "anthropic/claude-opus-4-5",
-      "provider": "openrouter"
+      "workspace": "~/.nanobot/workspace",
+      "model": "",
+      "provider": "custom",
+      "maxTokens": 8192,
+      "temperature": 0.1,
+      "maxToolIterations": 40,
+      "memoryWindow": 50,
+      "reasoningEffort": null
+    }
+  },
+  "channels": {
+    "sendProgress": true,
+    "sendToolHints": false,
+    "whatsapp": {
+      "enabled": false,
+      "bridgeUrl": "ws://localhost:3001",
+      "bridgeToken": "",
+      "allowFrom": []
+    },
+    "telegram": {
+      "enabled": true,
+      "token": "",
+      "allowFrom": [],
+      "proxy": null,
+      "replyToMessage": false
     }
   },
   "providers": {
-    "openrouter": {
-      "apiKey": "sk-or-v1-xxx"
+    "custom": {
+      "apiKey": "",
+      "apiBase": "",
+      "extraHeaders": null
     }
+  },
+  "gateway": {
+    "host": "0.0.0.0",
+    "port": 18790,
+    "heartbeat": {
+      "enabled": true,
+      "intervalS": 1800
+    }
+  },
+  "tools": {
+    "web": {
+      "proxy": null,
+      "search": {
+        "engine": "tavily",
+        "apiKey": "",
+        "maxResults": 10
+      }
+    },
+    "exec": {
+      "timeout": 60,
+      "pathAppend": ""
+    },
+    "restrictToWorkspace": false,
+    "mcpServers": {}
   }
 }
 ```
@@ -123,20 +143,6 @@ Run gateway:
 
 ```bash
 nanobot gateway
-```
-
-### Telegram config example
-
-```json
-{
-  "channels": {
-    "telegram": {
-      "enabled": true,
-      "token": "BOT_TOKEN",
-      "allowFrom": ["YOUR_USER_ID"]
-    }
-  }
-}
 ```
 
 ### Email config example
@@ -186,8 +192,6 @@ nanobot gateway
 nanobot --version
 nanobot status
 nanobot channels status
-nanobot provider login openai-codex
-nanobot provider login github-copilot
 ```
 
 ## Project structure
