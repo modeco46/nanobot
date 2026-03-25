@@ -261,9 +261,31 @@ class AgentLoop:
         return final_content, tools_used, messages
 
     def _resolve_session_model(self, session: Session) -> str:
-        """Return model configured for the session or the global default."""
+        """Return model for this session: session override → global override → default."""
         model = session.metadata.get("model")
-        return model if isinstance(model, str) and model.strip() else self.model
+        if isinstance(model, str) and model.strip():
+            return model
+        global_model = self._get_global_model()
+        if global_model:
+            return global_model
+        return self.model
+
+    def _get_global_model(self) -> str | None:
+        """Read the workspace-level model override, or None if not set."""
+        path = self.workspace / "global_model"
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+            return text if text else None
+        except OSError:
+            return None
+
+    def _set_global_model(self, model_name: str | None) -> None:
+        """Write (or delete) the workspace-level model override file."""
+        path = self.workspace / "global_model"
+        if model_name:
+            path.write_text(model_name, encoding="utf-8")
+        else:
+            path.unlink(missing_ok=True)
 
     async def run(self) -> None:
         """Run the agent loop, dispatching messages as tasks to stay responsive to /stop."""
@@ -406,21 +428,55 @@ class AgentLoop:
         if cmd.startswith("/model"):
             model_name = raw_cmd[6:].strip()
 
-            if model_name.lower() in {"reset", "default", "clear"}:
-                session.metadata.pop("model", None)
-                self.sessions.save(session)
+            # /model global reset  OR  /model global clear
+            if model_name.lower().startswith("global") and model_name[6:].strip().lower() in {"reset", "clear", "default", ""}:
+                self._set_global_model(None)
                 return OutboundMessage(
                     channel=msg.channel,
                     chat_id=msg.chat_id,
-                    content=f"Model reset to default: {self.model}",
+                    content=f"Global model override removed. Default is: {self.model}",
+                )
+
+            # /model global <provider/model>
+            if model_name.lower().startswith("global "):
+                global_name = model_name[7:].strip()
+                if not global_name or any(ch.isspace() for ch in global_name) or "/" not in global_name:
+                    return OutboundMessage(
+                        channel=msg.channel,
+                        chat_id=msg.chat_id,
+                        content="Usage: /model global <provider/model>\nExample: /model global x-ai/grok-4.1-fast",
+                    )
+                self._set_global_model(global_name)
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=f"Global model set to: {global_name}\nApplies to all chats and groups.",
+                )
+
+            # /model reset  (per-session reset — existing behaviour)
+            if model_name.lower() in {"reset", "default", "clear"}:
+                session.metadata.pop("model", None)
+                self.sessions.save(session)
+                effective = self._resolve_session_model(session)
+                return OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=f"Session model reset. Effective model: {effective}",
                 )
 
             models, source, load_error = load_models_allowlist()
 
+            # /model  (status)
             if not model_name:
                 current = self._resolve_session_model(session)
-                overridden = session.metadata.get("model")
-                mode = "chat override" if overridden else "default"
+                session_override = session.metadata.get("model")
+                global_override = self._get_global_model()
+                if session_override:
+                    mode = "session override"
+                elif global_override:
+                    mode = "global override"
+                else:
+                    mode = "default"
                 src = str(source) if source else "(file not found)"
                 listing = "\nAvailable models:\n- " + "\n- ".join(models) if models else "\nAvailable models: list is empty"
                 error_line = f"\nWarning: {load_error}" if load_error else ""
@@ -430,11 +486,13 @@ class AgentLoop:
                     content=(
                         f"Current model: {current} ({mode})\n"
                         f"Models source: {src}{listing}{error_line}\n"
-                        "Usage: /model <provider/model> — switch to any model\n"
-                        "Reset to default: /model reset"
+                        "Usage: /model <provider/model> — switch for this chat\n"
+                        "       /model global <provider/model> — switch for all chats\n"
+                        "Reset: /model reset | /model global reset"
                     ),
                 )
 
+            # /model <provider/model>  (per-session override — existing behaviour)
             if any(ch.isspace() for ch in model_name) or "/" not in model_name:
                 return OutboundMessage(
                     channel=msg.channel,
