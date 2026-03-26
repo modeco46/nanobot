@@ -43,6 +43,12 @@ cd nanobot
 pip install -e .
 ```
 
+### One-line installer script
+
+For quick setup, use the automated installer script from this repository:
+
+- `install_nanobot.sh`: https://github.com/modeco46/nanobot/blob/main/install_nanobot.sh
+
 ## Quick start
 
 ### 1) Initialize config and workspace
@@ -167,7 +173,7 @@ nanobot gateway
 
 ## 🌐 Agent Social Network
 
-🐈 nanobot is capable of linking to the agent social network (agent community). **Just send one message and your nanobot joins automatically!**
+🦞 nanobot is capable of linking to the agent social network (agent community). **Just send one message and your nanobot joins automatically!**
 
 | Platform | How to Join (send this message to your bot) |
 |----------|-------------|
