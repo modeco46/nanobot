@@ -35,6 +35,17 @@ This README reflects the current codebase (including merged PR changes) and inte
 
 ## Installation
 
+### One-line installer script
+
+For quick setup, use the automated installer script from this repository:
+
+- install_nanobot.sh: https://github.com/modeco46/nanobot/blob/main/install_nanobot.sh
+```
+wget -O install_nanobot.sh https://raw.githubusercontent.com/modeco46/nanobot/main/install_nanobot.sh
+chmod +x install_nanobot.sh
+./install_nanobot.sh
+```
+
 ### From source (recommended for development)
 
 ```bash
@@ -42,12 +53,6 @@ git clone https://github.com/modeco46/nanobot
 cd nanobot
 pip install -e .
 ```
-
-### One-line installer script
-
-For quick setup, use the automated installer script from this repository:
-
-- `install_nanobot.sh`: https://github.com/modeco46/nanobot/blob/main/install_nanobot.sh
 
 ## Quick start
 
