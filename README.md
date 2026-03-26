@@ -186,6 +186,7 @@ You can change the active model without restarting the bot by sending `/model` c
 | `/model global <provider/model>` | Switch model for **all** chats and groups |
 | `/model global reset` | Remove global override (falls back to config default) |
 
+
 **Priority:** session override → global override → config default (`model` in `config.json`)
 
 The global override is stored in `{workspace}/global_model` as plain text and survives restarts.
@@ -198,6 +199,13 @@ x-ai/grok-4.1-fast
 openai/gpt-5-mini
 ```
 
+## Bot commands
+
+- /new — Start a new conversation
+- /model — Show or change model for this chat
+- /stop — Stop the current task
+- /help — Show available commands
+ 
 ## Tools and capabilities
 
 - **Shell execution tool** with timeout/path controls
