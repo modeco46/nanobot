@@ -45,35 +45,24 @@ async def test_model_command_sets_and_resets_session_model(tmp_path, config_near
         InboundMessage(channel="cli", sender_id="u", chat_id="c", content="/model")
     )
     assert "openai/gpt-4o-mini" in show_resp.content
-    assert "chat override" in show_resp.content
+    assert "session override" in show_resp.content
     assert "Models source:" in show_resp.content
 
     reset_resp = await loop._process_message(
         InboundMessage(channel="cli", sender_id="u", chat_id="c", content="/model reset")
     )
-    assert "Model reset to default" in reset_resp.content
+    assert "Session model reset" in reset_resp.content
 
 
 @pytest.mark.asyncio
-async def test_model_command_rejects_models_outside_allowlist(tmp_path, config_near_models):
+async def test_model_command_accepts_models_outside_display_list(tmp_path, config_near_models):
     loop = AgentLoop(bus=MessageBus(), provider=_DummyProvider(), workspace=tmp_path)
 
     resp = await loop._process_message(
         InboundMessage(channel="cli", sender_id="u", chat_id="c", content="/model anthropic/claude-3-5-sonnet")
     )
 
-    assert "not in allowlist" in resp.content
-
-
-@pytest.mark.asyncio
-async def test_model_command_rejects_invalid_format_without_provider_prefix(tmp_path, config_near_models):
-    loop = AgentLoop(bus=MessageBus(), provider=_DummyProvider(), workspace=tmp_path)
-
-    resp = await loop._process_message(
-        InboundMessage(channel="cli", sender_id="u", chat_id="c", content="/model gemini-2.5-flash-preview")
-    )
-
-    assert "Invalid model name" in resp.content
+    assert "Model switched" in resp.content
 
 
 @pytest.mark.asyncio
@@ -115,3 +104,70 @@ async def test_regular_messages_use_session_model_override(tmp_path):
 
     assert loop._run_agent_loop.await_count == 1
     assert loop._run_agent_loop.await_args.kwargs["model"] == "openai/gpt-4o-mini"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["gemini-3.8-flash", "google/gemini-3.5-flash"])
+@pytest.mark.parametrize("scope", ["", "global "])
+async def test_model_command_preserves_exact_id_and_passes_it_to_provider(
+    tmp_path, config_near_models, model, scope,
+):
+    provider = _DummyProvider()
+    provider.chat = AsyncMock(return_value=LLMResponse(content="ok"))
+    loop = AgentLoop(bus=MessageBus(), provider=provider, workspace=tmp_path)
+    response = await loop._process_message(
+        InboundMessage(channel="cli", sender_id="u", chat_id="c", content=f"/model {scope}{model}")
+    )
+    assert model in response.content
+
+    # Reload from disk: both session and global overrides must survive a restart.
+    loop = AgentLoop(bus=MessageBus(), provider=provider, workspace=tmp_path)
+    session = loop.sessions.get_or_create("cli:c")
+    assert loop._resolve_session_model(session) == model
+    other = loop.sessions.get_or_create("cli:other")
+    assert loop._resolve_session_model(other) == (model if scope else loop.model)
+    await loop._process_message(
+        InboundMessage(channel="cli", sender_id="u", chat_id="c", content="hello")
+    )
+    provider.chat.assert_awaited_once()
+    assert provider.chat.await_args.kwargs["model"] == model
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scope", ["", "global "])
+@pytest.mark.parametrize("model", ["gemini flash", "google/gemini\tflash", "gemini\nflash"])
+async def test_invalid_model_does_not_change_existing_overrides(
+    tmp_path, config_near_models, scope, model,
+):
+    loop = AgentLoop(bus=MessageBus(), provider=_DummyProvider(), workspace=tmp_path)
+    session = loop.sessions.get_or_create("cli:c")
+    session.metadata["model"] = "google/gemini-3.5-flash"
+    loop.sessions.save(session)
+    loop._set_global_model("global-model")
+    response = await loop._process_message(
+        InboundMessage(channel="cli", sender_id="u", chat_id="c", content=f"/model {scope}{model}")
+    )
+    assert ("Usage:" if scope else "Invalid model name") in response.content
+    assert session.metadata["model"] == "google/gemini-3.5-flash"
+    assert loop._get_global_model() == "global-model"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reset", ["reset", "clear", "default"])
+async def test_model_override_priority_and_reset(tmp_path, config_near_models, reset):
+    loop = AgentLoop(bus=MessageBus(), provider=_DummyProvider(), workspace=tmp_path)
+
+    async def command(text):
+        return await loop._process_message(
+            InboundMessage(channel="cli", sender_id="u", chat_id="c", content=text)
+        )
+
+    await command("/model global gemini-3.8-flash")
+    await command("/model google/gemini-3.5-flash")
+    session = loop.sessions.get_or_create("cli:c")
+    assert loop._resolve_session_model(session) == "google/gemini-3.5-flash"
+    await command(f"/model {reset}")
+    assert loop._resolve_session_model(session) == "gemini-3.8-flash"
+    await command(f"/model global {reset}")
+    assert loop._resolve_session_model(session) == loop.model
+    assert not (tmp_path / "global_model").exists()

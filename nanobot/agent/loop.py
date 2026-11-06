@@ -437,14 +437,14 @@ class AgentLoop:
                     content=f"Global model override removed. Default is: {self.model}",
                 )
 
-            # /model global <provider/model>
+            # /model global <model>
             if model_name.lower().startswith("global "):
                 global_name = model_name[7:].strip()
-                if not global_name or any(ch.isspace() for ch in global_name) or "/" not in global_name:
+                if not global_name or any(ch.isspace() for ch in global_name):
                     return OutboundMessage(
                         channel=msg.channel,
                         chat_id=msg.chat_id,
-                        content="Usage: /model global <provider/model>\nExample: /model global x-ai/grok-4.1-fast",
+                        content="Usage: /model global <model>\nExample: /model global gemini-3.8-flash",
                     )
                 self._set_global_model(global_name)
                 return OutboundMessage(
@@ -486,18 +486,19 @@ class AgentLoop:
                     content=(
                         f"Current model: {current} ({mode})\n"
                         f"Models source: {src}{listing}{error_line}\n"
-                        "Usage: /model <provider/model> — switch for this chat\n"
-                        "       /model global <provider/model> — switch for all chats\n"
+                        "Usage: /model <model> — switch for this chat\n"
+                        "       /model global <model> — switch for all chats\n"
+                        "Model names may include a provider prefix (provider/model) or omit it.\n"
                         "Reset: /model reset | /model global reset"
                     ),
                 )
 
-            # /model <provider/model>  (per-session override — existing behaviour)
-            if any(ch.isspace() for ch in model_name) or "/" not in model_name:
+            # /model <model>  (per-session override — existing behaviour)
+            if any(ch.isspace() for ch in model_name):
                 return OutboundMessage(
                     channel=msg.channel,
                     chat_id=msg.chat_id,
-                    content="Invalid model name. Use format: /model provider/model",
+                    content="Invalid model name. Use /model <model> without whitespace.",
                 )
 
             session.metadata["model"] = model_name
