@@ -7,6 +7,7 @@ from nanobot.agent.loop import AgentLoop
 from nanobot.bus.events import InboundMessage
 from nanobot.bus.queue import MessageBus
 from nanobot.config.loader import get_config_path, set_config_path
+from nanobot.heartbeat.service import HeartbeatService
 from nanobot.providers.base import LLMProvider, LLMResponse
 
 
@@ -171,3 +172,38 @@ async def test_model_override_priority_and_reset(tmp_path, config_near_models, r
     await command(f"/model global {reset}")
     assert loop._resolve_session_model(session) == loop.model
     assert not (tmp_path / "global_model").exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("trigger", ["_tick", "trigger_now"])
+async def test_heartbeat_follows_global_model_changes_and_reset(
+    tmp_path, config_near_models, trigger,
+):
+    provider = _DummyProvider()
+    provider.chat = AsyncMock(return_value=LLMResponse(content="", tool_calls=[]))
+    loop = AgentLoop(bus=MessageBus(), provider=provider, workspace=tmp_path, model="config-model")
+    (tmp_path / "HEARTBEAT.md").write_text("Check tasks", encoding="utf-8")
+    service = HeartbeatService(
+        workspace=tmp_path, provider=provider, model=loop.model,
+        model_resolver=loop._get_global_model,
+    )
+
+    async def check(expected):
+        await getattr(service, trigger)()
+        assert provider.chat.await_args.kwargs["model"] == expected
+
+    async def command(text):
+        await loop._process_message(
+            InboundMessage(channel="cli", sender_id="u", chat_id="c", content=text)
+        )
+
+    await check("config-model")
+    await command("/model chat-only-model")
+    await check("config-model")
+    await command("/model global gemini-3.8-flash")
+    await check("gemini-3.8-flash")
+    await command("/model global google/gemini-3.5-flash")
+    await check("google/gemini-3.5-flash")
+    await command("/model global reset")
+    await check("config-model")
+    assert provider.chat.await_count == 5
