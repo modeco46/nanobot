@@ -206,8 +206,6 @@ change the configured provider, API base URL, or API key.
 **Priority:** session override → global override → config default (`model` in `config.json`)
 
 The global override is stored in `{workspace}/global_model` as plain text and survives restarts.
-Heartbeat task checks use the current global override, falling back to the configured model.
-Changes and resets apply on the next check without restarting; chat-specific overrides do not affect these checks.
 
 To pre-populate the list shown by `/model`, create a `models` file next to `config.json`:
 

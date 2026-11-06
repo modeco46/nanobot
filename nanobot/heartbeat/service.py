@@ -59,12 +59,10 @@ class HeartbeatService:
         on_notify: Callable[[str], Coroutine[Any, Any, None]] | None = None,
         interval_s: int = 30 * 60,
         enabled: bool = True,
-        model_resolver: Callable[[], str | None] | None = None,
     ):
         self.workspace = workspace
         self.provider = provider
         self.model = model
-        self.model_resolver = model_resolver
         self.on_execute = on_execute
         self.on_notify = on_notify
         self.interval_s = interval_s
@@ -89,8 +87,6 @@ class HeartbeatService:
 
         Returns (action, tasks) where action is 'skip' or 'run'.
         """
-        # Resolve at request time so global changes and resets apply without a restart.
-        model = (self.model_resolver() if self.model_resolver else None) or self.model
         response = await self.provider.chat(
             messages=[
                 {"role": "system", "content": "You are a heartbeat agent. Call the heartbeat tool to report your decision."},
@@ -100,7 +96,7 @@ class HeartbeatService:
                 )},
             ],
             tools=_HEARTBEAT_TOOL,
-            model=model,
+            model=self.model,
         )
 
         if not response.has_tool_calls:
