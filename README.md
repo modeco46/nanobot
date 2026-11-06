@@ -192,11 +192,16 @@ You can change the active model without restarting the bot by sending `/model` c
 | Command | Effect |
 |---|---|
 | `/model` | Show current model, source, and available models |
-| `/model <provider/model>` | Switch model for this chat/session only |
+| `/model <model>` | Switch model for this chat/session only |
 | `/model reset` | Clear session override (falls back to global or config default) |
-| `/model global <provider/model>` | Switch model for **all** chats and groups |
+| `/model global <model>` | Switch model for **all** chats and groups |
 | `/model global reset` | Remove global override (falls back to config default) |
 
+
+Use the exact model ID expected by your configured API, with or without a provider prefix:
+for example, `/model google/gemini-3.5-flash` or `/model gemini-3.8-flash`.
+Model IDs cannot contain whitespace. This command changes the model only; it does not
+change the configured provider, API base URL, or API key.
 
 **Priority:** session override → global override → config default (`model` in `config.json`)
 
