@@ -439,6 +439,7 @@ def gateway(
         workspace=config.workspace_path,
         provider=provider,
         model=agent.model,
+        model_resolver=agent._get_global_model,
         on_execute=on_heartbeat_execute,
         on_notify=on_heartbeat_notify,
         interval_s=hb_cfg.interval_s,

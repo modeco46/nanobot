@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -115,3 +116,25 @@ async def test_trigger_now_returns_none_when_decision_is_skip(tmp_path) -> None:
     )
 
     assert await service.trigger_now() is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("resolved_model", [None, "", "gemini-3.8-flash", "google/gemini-3.5-flash"])
+async def test_decide_resolves_model_with_config_fallback(tmp_path, resolved_model):
+    provider = DummyProvider([])
+    provider.chat = AsyncMock(return_value=LLMResponse(content="", tool_calls=[]))
+    service = HeartbeatService(
+        workspace=tmp_path, provider=provider, model="config-model",
+        model_resolver=lambda: resolved_model,
+    )
+    await service._decide("tasks")
+    assert provider.chat.await_args.kwargs["model"] == (resolved_model or "config-model")
+
+
+@pytest.mark.asyncio
+async def test_decide_without_resolver_keeps_configured_model(tmp_path):
+    provider = DummyProvider([])
+    provider.chat = AsyncMock(return_value=LLMResponse(content="", tool_calls=[]))
+    service = HeartbeatService(workspace=tmp_path, provider=provider, model="config-model")
+    await service._decide("tasks")
+    assert provider.chat.await_args.kwargs["model"] == "config-model"
